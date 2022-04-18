@@ -1,4 +1,8 @@
-## Welcome to GitHub Pages
+## 欢迎来到我的github个人首页
+
+由于公司无法访问大部分外网，计划使用该网站分享自己的学习资料，用以查阅以及工作之余进行学习
+
+另计划学习爬虫，定时爬取知乎热榜，使得上班可以自由摸鱼
 
 You can use the [editor on GitHub](https://github.com/liaowucisheng/liaowucisheng.github.io/edit/main/index.md) to maintain and preview the content for your website in Markdown files.
 
