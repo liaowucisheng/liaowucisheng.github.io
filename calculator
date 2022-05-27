@@ -1,0 +1,389 @@
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>org.example</groupId>
+    <artifactId>calculator-compare-groovy-qlexpress</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <properties>
+        <maven.compiler.source>8</maven.compiler.source>
+        <maven.compiler.target>8</maven.compiler.target>
+        <qlexpress.version>3.3.0</qlexpress.version>
+    </properties>
+    <dependencies>
+        <!-- lombok -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.22</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <version>1.7.25</version>
+            <scope>compile</scope>
+        </dependency>
+
+        <!-- groovy -->
+        <dependency>
+            <groupId>org.codehaus.groovy</groupId>
+            <artifactId>groovy</artifactId>
+            <version>3.0.10</version>
+        </dependency>
+        <!-- junit-jupiter-api -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <version>5.8.2</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- QLExpress -->
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>QLExpress</artifactId>
+            <version>${qlexpress.version}</version>
+        </dependency>
+
+        <!-- aviator -->
+        <dependency>
+            <groupId>com.googlecode.aviator</groupId>
+            <artifactId>aviator</artifactId>
+            <version>5.3.1</version>
+        </dependency>
+    </dependencies>
+</project>
+
+```java
+package common.util;
+
+import com.googlecode.aviator.AviatorEvaluator;
+import com.ql.util.express.DefaultContext;
+import com.ql.util.express.ExpressRunner;
+import groovy.lang.Binding;
+import groovy.lang.GroovyShell;
+import lombok.extern.slf4j.Slf4j;
+import my.MyGroovyScriptEngine;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * 表达式解析工具
+ */
+@Slf4j
+public class Calculator {
+    // 不作为类属性的话，每回都要新创建，耗时极长，可考虑注入bean
+    // QLExpress 语法分析和计算的入口
+    private static final ExpressRunner EXPRESS_RUNNER = new ExpressRunner(true, false);
+
+    private Calculator() {
+    }
+
+    /**
+     * 根据上下文计算表达式-GroovyShell
+     *
+     * @param express 表达式
+     * @param context 上下文
+     * @return 计算结果
+     */
+    public static Object calculateByGroovyShell(String express, Map<String, Object> context) {
+        Binding initBinding = new Binding();
+        // 设置参数
+        context.forEach(initBinding::setVariable);
+        GroovyShell shell = new GroovyShell(initBinding);
+
+        Object eval = null;
+        try {
+            // 根据当前绑定评估一些脚本并返回结果
+            eval = shell.evaluate(express);
+        } catch (Exception e) {
+            log.info("The error is: {}", e.getMessage());
+        } finally {
+            // 清缓存
+            shell.getClassLoader().clearCache();
+        }
+        return eval;
+    }
+
+    private static final MyGroovyScriptEngine MY_GROOVY_SCRIPT_ENGINE = new MyGroovyScriptEngine();
+    /**
+     * 根据上下文计算表达式-MyGroovyScriptEngine
+     *
+     * @param express 表达式
+     * @param context 上下文
+     * @return 计算结果
+     */
+    public static Object calculateByMyGroovyScriptEngine(String express, Map<String, Object> context) {
+        Binding initBinding = new Binding();
+        // 设置参数
+        context.forEach(initBinding::setVariable);
+        Object eval = null;
+        try {
+            // 根据当前绑定评估一些脚本并返回结果
+            eval = MY_GROOVY_SCRIPT_ENGINE.run(express, initBinding);
+        } catch (Exception e) {
+            log.info("The error is: {}", e.getMessage());
+        }
+        return eval;
+    }
+
+    /**
+     * 根据上下文计算表达式-QLExpress
+     *
+     * @param express 表达式
+     * @param context 上下文
+     * @return 计算结果
+     */
+    public static Object calculateByQLExpress(String express, DefaultContext<String, Object> context) {
+        // 开启高精度，关闭输出所有的跟踪信息
+        Object eval = null;
+        try {
+            eval = EXPRESS_RUNNER.execute(express, context, null, true, false);
+        } catch (Exception e) {
+            log.info("The error is: {}", e.getMessage());
+        } finally {
+            EXPRESS_RUNNER.clearExpressCache();
+        }
+        return eval;
+    }
+    /**
+     * 根据上下文计算表达式-aviator
+     *
+     * @param express 表达式
+     * @param context 上下文
+     * @return 计算结果
+     */
+    public static Object calculateByAviator(String express, HashMap<String, Object> context) {
+        Object eval = null;
+        try {
+            eval = AviatorEvaluator.execute(express, context); // 执行文本表达式而不缓存
+        } catch (Exception e) {
+            log.info("The error is: {}", e.getMessage());
+        } finally {
+            AviatorEvaluator.clearExpressionCache(); // 有没有 清除所有缓存的编译表达式 ,测试时没发现有影响运行时间
+        }
+        return eval;
+    }
+}
+
+```java
+package common.util;
+
+import com.ql.util.express.DefaultContext;
+import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.Test;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+
+@Slf4j
+class CalculatorTest {
+
+    /**
+     * Java使用 GroovyShell 调用 Groovy 测试
+     */
+    @Test
+    void calculateByGroovyShell() {
+        HashMap<String, Object> context = new HashMap<>();
+        List<String> expressList = new ArrayList<>();
+        {
+            expressList.add("text1.split(\":\")[1] + \".step\";");
+            expressList.add("text2.split(\":\")[1] + \".step\";");
+            expressList.add("text3.split(\"\\\\|\")[1] + \".\" + (text3.split(\"\\\\|\")[0].split(\":\"))[1].substring(0, 3) + \".UNIT\";");
+            expressList.add("text4.split(\"\\\\|\")[1] + \".\" + (text4.split(\"\\\\|\")[0].split(\"\\\\.\"))[1].substring(0, 4) + \".UNIT\";");
+            expressList.add("Integer.parseInt(text5.split(\":\")[1]) + 5");
+            expressList.add("Integer.parseInt(text6.split(\":\")[1]) + 5");
+            expressList.add("length/3");
+            expressList.add("((a+b)*(a+b)-4*a*c) > 0 ? 2 : \"1 or 0\"");
+            expressList.add("(d+e/3)+(d*e)");
+            expressList.add("if([1, 2, 3, 4, 5].contains(f)){ return true; } else { return false }");
+            context.put("text1", "step1:abc");
+            context.put("text2", "step1:thisIsNil");
+            context.put("text3", "u1:SKM1|skm");
+            context.put("text4", "y1s1.YYDS1|superStar");
+            context.put("text5", "a:123");
+            context.put("text6", "a:1024");
+            context.put("length", 6);
+            context.put("a", 1);
+            context.put("b", 2);
+            context.put("c", -3);
+            context.put("e", 12);
+            context.put("d", 10);
+            context.put("f", 4);
+        }
+        long starTime = System.currentTimeMillis();
+        for (int i = 0; i < 1; i++) {
+            for (String s : expressList) {
+                Calculator.calculateByGroovyShell(s, context);
+            }
+        }
+        long endTime = new Date().getTime();
+        long timeTaken = endTime - starTime;
+        log.info("GroovyShell运行时间为：{}ms", timeTaken);
+    }
+
+    /**
+     * QLExpress 解析表达式测试
+     */
+    @Test
+    void calculateByQLExpress() {
+        DefaultContext<String, Object> context = new DefaultContext<>();
+        List<String> expressList = new ArrayList<>();
+        {
+            expressList.add("text1.split(\":\")[1] + \".step\";");
+            expressList.add("text2.split(\":\")[1] + \".step\";");
+            expressList.add("text3.split(\"\\\\|\")[1] + \".\" + (text3.split(\"\\\\|\")[0].split(\":\"))[1].substring(0, 3) + \".UNIT\";");
+            expressList.add("text4.split(\"\\\\|\")[1] + \".\" + (text4.split(\"\\\\|\")[0].split(\"\\\\.\"))[1].substring(0, 4) + \".UNIT\";");
+            expressList.add("Integer.parseInt(text5.split(\":\")[1]) + 5");
+            expressList.add("Integer.parseInt(text6.split(\":\")[1]) + 5");
+            expressList.add("length/3");
+            expressList.add("((a+b)*(a+b)-4*a*c) > 0 ? 2 : \"1 or 0\"");
+            expressList.add("(d+e/3)+(d*e)");
+            expressList.add("if(f in (1, 2, 3, 4, 5)){ return true; } else { return false }");
+            context.put("text1", "step1:abc");
+            context.put("text2", "step1:thisIsNil");
+            context.put("text3", "u1:SKM1|skm");
+            context.put("text4", "y1s1.YYDS1|superStar");
+            context.put("text5", "a:123");
+            context.put("text6", "a:1024");
+            context.put("length", 6);
+            context.put("a", 1);
+            context.put("b", 2);
+            context.put("c", -3);
+            context.put("e", 12);
+            context.put("d", 10);
+            context.put("f", 4);
+        }
+        long starTime = System.currentTimeMillis();
+        for (int i = 0; i < 10000; i++) {
+            for (String s : expressList) {
+                Calculator.calculateByQLExpress(s, context);
+            }
+        }
+        long endTime = new Date().getTime();
+        long timeTaken = endTime - starTime;
+        log.info("QLExpress运行时间为：{}ms", timeTaken);
+    }
+
+    /**
+     * 自实现 MyGroovyScriptEngine 绕过监控文件夹（效率无提升）
+     */
+    @Test
+    void calculateByMyGroovyScriptEngine() {
+        HashMap<String, Object> context = new HashMap<>();
+        List<String> expressList = new ArrayList<>();
+        {
+            expressList.add("text1.split(\":\")[1] + \".step\";");
+            expressList.add("text2.split(\":\")[1] + \".step\";");
+            expressList.add("text3.split(\"\\\\|\")[1] + \".\" + (text3.split(\"\\\\|\")[0].split(\":\"))[1].substring(0, 3) + \".UNIT\";");
+            expressList.add("text4.split(\"\\\\|\")[1] + \".\" + (text4.split(\"\\\\|\")[0].split(\"\\\\.\"))[1].substring(0, 4) + \".UNIT\";");
+            expressList.add("Integer.parseInt(text5.split(\":\")[1]) + 5");
+            expressList.add("Integer.parseInt(text6.split(\":\")[1]) + 5");
+            expressList.add("length/3");
+            expressList.add("((a+b)*(a+b)-4*a*c) > 0 ? 2 : \"1 or 0\"");
+            expressList.add("(d+e/3)+(d*e)");
+            expressList.add("if([1, 2, 3, 4, 5].contains(f)){ return true; } else { return false }");
+            context.put("text1", "step1:abc");
+            context.put("text2", "step1:thisIsNil");
+            context.put("text3", "u1:SKM1|skm");
+            context.put("text4", "y1s1.YYDS1|superStar");
+            context.put("text5", "a:123");
+            context.put("text6", "a:1024");
+            context.put("length", 6);
+            context.put("a", 1);
+            context.put("b", 2);
+            context.put("c", -3);
+            context.put("e", 12);
+            context.put("d", 10);
+            context.put("f", 4);
+        }
+        long starTime = System.currentTimeMillis();
+        for (int i = 0; i < 5000; i++) {
+            for (String s : expressList) {
+                Calculator.calculateByMyGroovyScriptEngine(s, context);
+            }
+        }
+        long endTime = new Date().getTime();
+        long timeTaken = endTime - starTime;
+        log.info("MyGroovyScriptEngine运行时间为：{}ms", timeTaken);
+    }
+
+    /**
+     * 测试 aviator 解析效率
+     */
+    @Test
+    void calculateByAviator() {
+        HashMap<String, Object> context = new HashMap<>();
+        List<String> expressList = new ArrayList<>();   // 存放执行的表达式
+        // expressList 与 context 数据封装
+        {
+            expressList.add("string.split(text1, ':')[1] + '.step'");
+            expressList.add("string.split(text2, ':')[1] + '.step'");
+            expressList.add("string.split(text3, '\\\\|')[1] + '.' + string.substring(string.split(string.split(text3, '\\\\|')[0], ':')[1], 0, 3) + '.UNIT'");
+            expressList.add("string.split(text4, '\\\\|')[1] + '.' + string.substring(string.split(string.split(text4, '\\\\|')[0], '\\\\.')[1], 0, 4) + '.UNIT'");
+            expressList.add("long(string.split(text5, ':')[1]) + 5");
+            expressList.add("long(string.split(text6, ':')[1]) + 5");
+            expressList.add("length/3");
+            expressList.add("((a+b)*(a+b)-4*a*c) > 0 ? 2 : \"1 or 0\"");
+            expressList.add("(d+e/3)+(d*e)");
+            expressList.add("include(seq.array(int, 1, 2, 3, 4, 5), f) ? true : false ");
+            context.put("text1", "step1:abc");
+            context.put("text2", "step1:thisIsNil");
+            context.put("text3", "u1:SKM1|skm");
+            context.put("text4", "y1s1.YYDS1|superStar"); // superStar.YYDS.UNIT
+            context.put("text5", "a:123");
+            context.put("text6", "a:1024");
+            context.put("length", 6);
+            context.put("a", 1);
+            context.put("b", 2);
+            context.put("c", 3);
+            context.put("d", 10);
+            context.put("e", 12);
+            context.put("f", 4);
+        }
+        long starTime = System.currentTimeMillis();
+        for (int i = 0; i < 10000; i++) {
+            for (String s : expressList) {
+                Calculator.calculateByAviator(s, context);
+            }
+        }
+        long endTime = new Date().getTime();
+        long timeTaken = endTime - starTime;
+        log.info("Aviator运行时间为：{}ms", timeTaken);
+    }
+
+}
+
+```java
+package my;
+
+import groovy.lang.Binding;
+import groovy.lang.GroovyClassLoader;
+import groovy.lang.Script;
+import groovy.util.ResourceException;
+import groovy.util.ScriptException;
+import org.codehaus.groovy.runtime.InvokerHelper;
+
+public class MyGroovyScriptEngine {
+    private GroovyClassLoader groovyLoader = new GroovyClassLoader();
+
+    public Class returnClazz(String content) {
+        Class clazz = groovyLoader.parseClass(content, "temp.groovy");
+        return clazz;
+    }
+    public Script createScript(String scriptName, Binding binding) throws ResourceException, ScriptException {
+        return InvokerHelper.createScript(returnClazz(scriptName), binding);
+    }
+    public Object run(String scriptName, Binding binding) throws ResourceException, ScriptException {
+        return createScript(scriptName, binding).run();
+    }
+
+}
