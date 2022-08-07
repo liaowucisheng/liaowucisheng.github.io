@@ -1,0 +1,34 @@
+ <select id="foreach" resultType="com.pojo.Result">
+
+        select a.sch_org_id,
+               a.org_id,
+               a.inv_item_id,
+               sum(b.shuju) m
+        from table_a a,
+             table_b b
+        where 1 = 1
+          and b.item_id = a.inv_item_id
+          and b.org_id = a.sch_org_id
+        group by a.sch_org_id,
+                 a.org_id,
+                 a.inv_item_id
+    </select>
+    <select id="foreach2" resultType="com.pojo.Result">
+        select b.org_id sch_org_id,
+        'oi001' org_id,
+        b.item_id inv_item_id,
+        sum(b.shuju) m
+        from table_b b
+        where 1=1
+        and b.item_id in
+        <foreach collection="list" open="(" close=")" item="a" separator=",">
+            #{a.inv_item_id}
+        </foreach>
+        and b.org_id in
+        <foreach collection="list" open="(" close=")" item="a" separator=",">
+        #{a.sch_org_id}
+        </foreach>
+        group by b.org_id,
+        'oi001' ,
+        b.item_id
+    </select>
