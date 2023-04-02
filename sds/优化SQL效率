@@ -1,0 +1,114 @@
+SELECT *
+  FROM (SELECT BPA.ITEM_ID || BPA.PO_HEADER_ID || BPA.ORGANIZATION_ID ||
+               BPA.VENDOR_ID AS "keyId",
+               BPA.ORGANIZATION_ID AS "organizationId",
+               (SELECT ORG.ORGANIZATION_NAME_CN
+                  FROM APSUSER.ORGANIZATIONS ORG
+                 WHERE ORG.ORGANIZATION_ID = BPA.ORGANIZATION_ID) AS "organizationName",
+               B.SEGMENT1 AS "item",
+               B.INVENTORY_ITEM_ID AS "itemId",
+               B.ATTRIBUTE5 AS "partNo",
+               (SELECT G.BUSINESS_MODEL
+                  FROM FSS.FSS_ITEMS_INFO_GATHER G
+                 WHERE G.ITEM_ID = B.INVENTORY_ITEM_ID) AS "hiSiAttributeName",
+               BPA.VENDOR_ID AS "vendorId",
+               BPA.VENDOR_NAME AS "vendorName",
+               BPA.BPANO AS "bpaNo",
+               FLOOR(BPA.BLANKET_TOTAL_AMOUNT) AS "totalAmount",
+               FLOOR(BPA.TOTAL_QUANTITY) AS "totalQty",
+               FLOOR(BPA.AMOUNT_RELEASED) AS "releasedAmount",
+               FLOOR(BPA.QUANTITY_USED) AS "releasedQty",
+               FLOOR(BPA.AMOUNT_RELEASED / BPA.BLANKET_TOTAL_AMOUNT * 100) AS "bpaReleasedRate",
+               FLOOR(SUM(BPA.AMOUNT_RELEASED)
+                     OVER(PARTITION BY BPA.BPANO) / BPA.BLANKET_TOTAL_AMOUNT * 100) AS "bpaNoReleasedRate",
+               BPA.START_DATE AS "startDate",
+               BPA.END_DATE AS "endDate",
+               (SELECT CI.NAME
+                  FROM SCDPUSER.CONFIG_INFO CI
+                 WHERE CI.CODE = B.BUYER_ID
+                   AND CI.ORGANIZATION_ID = B.ORGANIZATION_ID
+                   AND CI.TYPE = 'UserBuyer') AS "buyerName",
+               (SELECT C.CEG_NAME
+                  FROM SCDPUSER.MV_ITEM_CEG C
+                 WHERE C.ITEM_ID = B.INVENTORY_ITEM_ID
+                   AND C.IS_VALID = 'Y') AS "ceg",
+               NVL(BPA.INCOMPLETE_QTY, 0) AS "incompleteQty",
+               NVL(BPA.REJECTED_QTY, 0) AS "rejectedQty",
+               BPA.CURRENCY_CODE "currencyCode",
+               BPA.UNIT_PRICE "unitPrice",
+               ROW_NUMBER() OVER(ORDER BY BPA.ITEM_ID, BPA.PO_HEADER_ID, BPA.ORGANIZATION_ID, BPA.VENDOR_ID) RN
+          FROM (SELECT "ITEM_ID",
+                       "PO_HEADER_ID",
+                       "VENDOR_ID",
+                       "VENDOR_NAME",
+                       "BPANO",
+                       "TOTAL_QUANTITY",
+                       "ITEM_REVISION",
+                       "QUANTITY_USED",
+                       "BLANKET_TOTAL_AMOUNT",
+                       "AMOUNT_RELEASED",
+                       "AMOUNT_REMAIN",
+                       --"MOQ",
+                       --"MPQ",
+                       "START_DATE",
+                       "END_DATE",
+                       "UNIT_PRICE",
+                       m."CURRENCY_CODE",
+                       "BPA_RANK",
+                       "INCOMPLETE_QTY",
+                       "REJECTED_QTY",
+                       O.ORGANIZATION_ID ORGANIZATION_ID,
+                       M.CREATION_DATE,
+                       M.AGENT_ID
+                  FROM (SELECT bpa."PO_HEADER_ID",
+                               bpa."BPA_HEADER_ID",
+                               bpa."VENDOR_CODE",
+                               bpa."VENDOR_NAME",
+                               bpa."VENDOR_ID",
+                               bpa."BPANO",
+                               bpa."BLANKET_TOTAL_AMOUNT",
+                               bpa."START_DATE",
+                               bpa."END_DATE",
+                               bpa."CURRENCY_CODE",
+                               bpa."TOTAL_QUANTITY",
+                               bpa."ITEM_REVISION",
+                               bpa."ITEM",
+                               bpa."ITEM_ID",
+                               bpa."UNIT_PRICE",
+                               bpa."UNIT_CODE",
+                               bpa."CREATION_DATE",
+                               bpa."AGENT_ID",
+                               bpa."BPA_RANK",
+                               NVL(BPA_REL.QTYRELEASED, 0) AS QUANTITY_USED,
+                               NVL(BPA_REL.AMOUNTRELEASED, 0) AS AMOUNT_RELEASED,
+                               BPA.BLANKET_TOTAL_AMOUNT -
+                               NVL(SUM(BPA_REL.AMOUNTRELEASED)
+                                   OVER(PARTITION BY BPA.PO_HEADER_ID,
+                                        BPA.UNIT_CODE),
+                                   0) AMOUNT_REMAIN,
+                               NVL(BPA_REL.INCOMPLETEQTY, 0) AS INCOMPLETE_QTY,
+                               NVL(BPA_REL.REJECTEDQTY, 0) AS REJECTED_QTY
+                          FROM SCDPUSER.MV_BPA_GLOBA BPA,
+                               SCDPUSER.MV_BPA_REL   BPA_REL
+                         WHERE BPA.BPA_RANK = 1
+                           AND BPA.PO_HEADER_ID = BPA_REL.PO_HEADER_ID(+)
+                           AND BPA.ITEM_ID = BPA_REL.ITEM_ID(+)) M,
+                       SCDPUSER.ORGANIZATIONS O
+                 WHERE M.UNIT_CODE = O.COMPANY_CODE) BPA,
+               SCDPUSER.MTL_SYSTEM_ITEMS_B B
+         WHERE BPA.ITEM_ID = B.ERP_INVENTORY_ITEM_ID
+           AND BPA.ORGANIZATION_ID = B.ORGANIZATION_ID
+           AND BPA.ORGANIZATION_ID <> 3385
+           AND BPA.ORGANIZATION_ID IN (93196,
+                                       107531,
+                                       100744,
+                                       3385,
+                                       86146,
+                                       10299,
+                                       241127,
+                                       114747,
+                                       8970,
+                                       10199,
+                                       157,
+                                       360))
+ WHERE RN BETWEEN 25 AND 50;
