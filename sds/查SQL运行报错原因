@@ -1,0 +1,23 @@
+
+SELECT 
+       (SELECT decode(COUNT(1), 0, 'Y', 'N')
+          FROM (SELECT nvl2(ci.name, 'Y', 'N') is_setup_pm
+                  FROM TABLE(split(t."plannerManager", ',')) pg,
+                       config_info ci
+                 WHERE ci.type(+) = 'ProgramManager'
+                   AND ci.organization_id(+) = t."organizationId"
+                   AND ci.is_valid(+) = 'Y'
+                   AND upper(ci.name(+)) = upper(pg.column_value))
+         WHERE is_setup_pm = 'N') "isSetupPm"
+  FROM (
+        SELECT '8B3F07C2000A09A3' "userPlannerId",
+               '1031' "organizationId",
+               'PNF_C' "plannerCodeName",
+               '胡4' "masterPlanner",
+               '胡-94' "makePlannerName",
+               '柯-76' "plannerLeader",
+               '张-54' "plannerManager"
+          FROM dual) t
+
+该sql会运行失败, 提示  ORA-00904: "T"."plannerManager":"标识符无效"
+请帮我分析原因
