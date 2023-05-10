@@ -1,0 +1,102 @@
+使用左外连接将以下子查询SQL改为以 scdpuser.common_check_temp 为主表(左表), scdpuser.user_planner,scdpuser.config_info,scdpuser.organizations为右表的SQL
+SELECT (SELECT up.user_planner_id
+          FROM scdpuser.user_planner  up,
+               scdpuser.config_info   ci,
+               scdpuser.organizations org
+         WHERE ci.type = 'ItemPlannerType'
+           AND ci.code = up.planner_code
+           AND ci.organization_id = up.organization_id
+           AND ci.organization_id = org.organization_id
+           AND upper(ci.name) = upper(cct.column_4)
+           AND upper(org.organization_name_cn) = upper(cct.column_1)) "userPlannerId",
+       (SELECT to_char(ci.code)
+          FROM scdpuser.config_info ci
+         WHERE ci.type = 'ItemPlannerType'
+           AND upper(ci.name) = upper(cct.column_4)
+           AND rownum = 1) "plannerCode",
+       upper(cct.column_4) "plannerCodeName",
+       (SELECT tu.login_name
+          FROM scdpuser.t_users tu
+         WHERE upper(regexp_substr(cct.column_2, '[0-9]+|WX[0-9]+|wx[0-9]+')) =
+               upper(tu.employee_number)) "masterPlanner",
+       (SELECT to_char(org.organization_id)
+          FROM scdpuser.organizations org
+         WHERE upper(org.organization_name_cn) = upper(cct.column_1)) "organizationId",
+       upper(cct.column_1) "organizationName",
+       cct.column_3 "makePlannerName",
+       cct.column_5 "workOrderCode",
+       cct.column_6 "type",
+       cct.column_7 "pdt",
+       cct.column_8 "product",
+       cct.column_9 "description",
+       (SELECT ci.code
+          FROM scdpuser.config_info ci
+         WHERE ci.type = 'BusinessGroup'
+           AND ci.name = cct.column_10
+           AND rownum = 1) "businessGroupCode",
+       cct.column_10 "businessGroupName",
+       cct.column_11 "plannerLeader",
+       cct.column_12 "plannerManager",
+       (SELECT to_char(MAX(ci.code) + 1)
+          FROM scdpuser.config_info ci
+         WHERE ci.type = 'ItemPlannerType') "maxPlannerCode",
+       (SELECT to_char(up.planner_code)
+          FROM scdpuser.user_planner  up,
+               scdpuser.config_info   ci,
+               scdpuser.organizations org
+         WHERE ci.type = 'ItemPlannerType'
+           AND ci.code = up.planner_code
+           AND ci.organization_id = up.organization_id
+           AND ci.organization_id = org.organization_id
+           AND upper(ci.name) = upper(cct.column_4)
+           AND upper(org.organization_name_cn) = upper(cct.column_1)) "plannerCodeOld",
+       (SELECT to_char(up.organization_id)
+          FROM scdpuser.user_planner  up,
+               scdpuser.config_info   ci,
+               scdpuser.organizations org
+         WHERE ci.type = 'ItemPlannerType'
+           AND ci.code = up.planner_code
+           AND ci.organization_id = up.organization_id
+           AND ci.organization_id = org.organization_id
+           AND upper(ci.name) = upper(cct.column_4)
+           AND upper(org.organization_name_cn) = upper(cct.column_1)) "organizationIdOld",
+       (SELECT decode(COUNT(1), 0, 'Y', 'N')
+          FROM scdpuser.user_planner  up,
+               scdpuser.config_info   ci,
+               scdpuser.organizations org
+         WHERE ci.type = 'ItemPlannerType'
+           AND ci.code = up.planner_code
+           AND ci.organization_id = up.organization_id
+           AND ci.organization_id = org.organization_id
+           AND upper(ci.name) = upper(cct.column_4)
+           AND upper(org.organization_name_cn) = upper(cct.column_1)) "plannerCodeCheck",
+       (SELECT decode(COUNT(1), 0, 'N', 'Y')
+          FROM scdpuser.config_info ci, scdpuser.organizations org
+         WHERE ci.type = 'ItemPlannerType'
+           AND upper(ci.name) = upper(cct.column_4)
+           AND upper(org.organization_name_cn) = upper(cct.column_1)
+           AND ci.organization_id = org.organization_id
+           AND rownum = 1) "plannerCodeExist",
+       (SELECT to_char(ci.code)
+          FROM scdpuser.config_info ci, scdpuser.organizations org
+         WHERE ci.type = 'ItemPlannerType'
+           AND upper(ci.name) = upper(cct.column_4)
+           AND upper(org.organization_name_cn) = upper(cct.column_1)
+           AND ci.organization_id = org.organization_id
+           AND rownum = 1) "plannerCodeNew",
+       (SELECT COUNT(1)
+          FROM scdpuser.mtl_system_items_b msib,
+               scdpuser.user_planner       up,
+               scdpuser.config_info        ci,
+               scdpuser.organizations      org
+         WHERE ci.type = 'ItemPlannerType'
+           AND ci.code = up.planner_code
+           AND ci.organization_id = up.organization_id
+           AND ci.organization_id = org.organization_id
+           AND upper(ci.name) = upper(cct.column_4)
+           AND upper(org.organization_name_cn) = upper(cct.column_1)
+           AND msib.planner_code = up.planner_code
+           AND msib.organization_id = org.organization_id
+           AND rownum = 1) "isBeUsed"
+  FROM scdpuser.common_check_temp cct
+ WHERE cct.check_group_id = '20230510152256'
