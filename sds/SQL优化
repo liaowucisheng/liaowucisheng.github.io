@@ -100,3 +100,74 @@ SELECT (SELECT up.user_planner_id
            AND rownum = 1) "isBeUsed"
   FROM scdpuser.common_check_temp cct
  WHERE cct.check_group_id = '20230510152256'
+
+
+SELECT
+up.user_planner_id "userPlannerId",
+to_char(ci.code) "plannerCode",
+upper(cct.column_4) "plannerCodeName",
+tu.login_name "masterPlanner",
+to_char(org.organization_id) "organizationId",
+upper(cct.column_1) "organizationName",
+cct.column_3 "makePlannerName",
+cct.column_5 "workOrderCode",
+cct.column_6 "type",
+cct.column_7 "pdt",
+cct.column_8 "product",
+cct.column_9 "description",
+ci2.code "businessGroupCode",
+cct.column_10 "businessGroupName",
+cct.column_11 "plannerLeader",
+cct.column_12 "plannerManager",
+to_char(MAX(ci3.code) + 1) "maxPlannerCode",
+to_char(up.planner_code) "plannerCodeOld",
+to_char(up.organization_id) "organizationIdOld",
+decode(COUNT(up.planner_code), 0, 'Y', 'N') "plannerCodeCheck",
+decode(COUNT(ci4.code), 0, 'N', 'Y') "plannerCodeExist",
+to_char(ci5.code) "plannerCodeNew",
+COUNT(msib.inventory_item_id) "isBeUsed"
+FROM
+scdpuser.common_check_temp cct
+LEFT JOIN scdpuser.user_planner up ON ci.name = cct.column_4
+AND up.organization_id = org.organization_id
+AND up.planner_code = ci.code
+LEFT JOIN scdpuser.config_info ci ON ci.type = 'ItemPlannerType'
+AND upper(ci.name) = upper(cct.column_4)
+LEFT JOIN scdpuser.organizations org ON org.organization_id = ci.organization_id
+AND upper(org.organization_name_cn) = upper(cct.column_1)
+LEFT JOIN scdpuser.t_users tu ON upper(regexp_substr(cct.column_2, '[0-9]+|WX[0-9]+|wx[0-9]+')) = upper(tu.employee_number)
+LEFT JOIN scdpuser.config_info ci2 ON ci2.type = 'BusinessGroup'
+AND ci2.name = cct.column_10
+LEFT JOIN scdpuser.config_info ci3 ON ci3.type = 'ItemPlannerType'
+LEFT JOIN scdpuser.config_info ci4 ON ci4.type = 'ItemPlannerType'
+AND upper(ci4.name) = upper(cct.column_4)
+AND ci4.organization_id = org.organization_id
+LEFT JOIN scdpuser.config_info ci5 ON ci5.type = 'ItemPlannerType'
+AND upper(ci5.name) = upper(cct.column_4)
+AND ci5.organization_id = org.organization_id
+LEFT JOIN scdpuser.mtl_system_items_b msib ON msib.planner_code = up.planner_code
+AND msib.organization_id = org.organization_id
+WHERE
+cct.check_group_id = '20230510152256'
+GROUP BY
+up.user_planner_id,
+ci.code,
+cct.column_4,
+tu.login_name,
+org.organization_id,
+cct.column_1,
+cct.column_3,
+cct.column_5,
+cct.column_6,
+cct.column_7,
+cct.column_8,
+cct.column_9,
+ci2.code,
+cct.column_10,
+cct.column_11,
+cct.column_12,
+up.planner_code,
+up.organization_id,
+ci3.code,
+ci4.code,
+ci5.code
